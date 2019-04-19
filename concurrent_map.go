@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-const ShardCount = 30
+const ShardCount = 100
 
 // ConcurrentMap is a "thread" safe map of type string:Anything.
 // To avoid lock bottlenecks this map is dived to several (ShardCount) map shards.

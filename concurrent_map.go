@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// ShardCount represent the number of shard the map is devided into.
 const ShardCount = 100
 
 // ConcurrentMap is a "thread" safe map of type string:Anything.

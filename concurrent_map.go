@@ -23,9 +23,10 @@ type ConcurrentMapShared struct {
 // New creates a new concurrent map.
 func New(maxSize int) ConcurrentMap {
 	m := make(ConcurrentMap, ShardCount)
+	shardKeySize := maxSize / ShardCount
 	for i := 0; i < ShardCount; i++ {
 		m[i] = &ConcurrentMapShared{
-			maxSize: maxSize,
+			maxSize: shardKeySize,
 			items:   make(map[string]interface{}),
 		}
 	}
@@ -321,11 +322,11 @@ func (m ConcurrentMap) FindOldest() string {
 	keys := []string{}
 	for i := 0; i < ShardCount; i++ {
 		shard := m[i]
+		shard.Lock()
 		if len(shard.mapKeys) > 0 {
-			shard.Lock()
 			keys = append(keys, shard.mapKeys[0])
-			shard.Unlock()
 		}
+		shard.Unlock()
 	}
 	return keys[0]
 }
@@ -362,7 +363,9 @@ func (m ConcurrentMap) removeFirstElement(key string) {
 	shard := m.GetShard(key)
 	shard.Lock()
 	if len(shard.mapKeys) > 0 {
-		copy(shard.mapKeys[0:], shard.mapKeys[1:])
+		for i := 0; i < len(shard.mapKeys)-1; i++ {
+			shard.mapKeys[i] = shard.mapKeys[i+1]
+		}
 		shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]
 	}
 	shard.Unlock()
@@ -373,14 +376,13 @@ func (m ConcurrentMap) removeMapKey(key string) {
 	shard := m.GetShard(key)
 
 	if len(shard.mapKeys) > 0 {
-		for i := 0; i < len(shard.mapKeys); i++ {
+		for i := 0; i < len(shard.mapKeys)-1; i++ {
 			// The mutex lock will be called by the method invoker.
 			if string(key) == shard.mapKeys[i] {
-				// delete key from keys slice
-				copy(shard.mapKeys[i:], shard.mapKeys[i+1:])
-				shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]
+				shard.mapKeys[i] = shard.mapKeys[i+1]
 			}
 		}
+		shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]
 	}
 }
 

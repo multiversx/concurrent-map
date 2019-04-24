@@ -7,10 +7,11 @@ import (
 )
 
 func BenchmarkItems(b *testing.B) {
-	m := New()
+	count := 10000
+	m := New(count)
 
-	// Insert 100 elements.
-	for i := 0; i < 10000; i++ {
+	// Insert 10000 elements.
+	for i := 0; i < count; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
 	for i := 0; i < b.N; i++ {
@@ -19,10 +20,11 @@ func BenchmarkItems(b *testing.B) {
 }
 
 func BenchmarkMarshalJson(b *testing.B) {
-	m := New()
+	count := 10000
+	m := New(count)
 
 	// Insert 100 elements.
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < count; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
 	for i := 0; i < b.N; i++ {
@@ -40,7 +42,7 @@ func BenchmarkStrconv(b *testing.B) {
 }
 
 func BenchmarkSingleInsertAbsent(b *testing.B) {
-	m := New()
+	m := New(1000)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		m.Set(strconv.Itoa(i), "value")
@@ -56,7 +58,7 @@ func BenchmarkSingleInsertAbsentSyncMap(b *testing.B) {
 }
 
 func BenchmarkSingleInsertPresent(b *testing.B) {
-	m := New()
+	m := New(1000)
 	m.Set("key", "value")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -74,7 +76,7 @@ func BenchmarkSingleInsertPresentSyncMap(b *testing.B) {
 }
 
 func benchmarkMultiInsertDifferent(b *testing.B) {
-	m := New()
+	m := New(1000)
 	finished := make(chan struct{}, b.N)
 	_, set := GetSet(m, finished)
 	b.ResetTimer()
@@ -89,10 +91,7 @@ func benchmarkMultiInsertDifferent(b *testing.B) {
 func BenchmarkMultiInsertDifferentSyncMap(b *testing.B) {
 	var m sync.Map
 	finished := make(chan struct{}, b.N)
-	err, set := GetSetSyncMap(&m, finished)
-	if err != nil {
-		b.FailNow()
-	}
+	_, set := GetSetSyncMap(&m, finished)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		go set(strconv.Itoa(i), "value")
@@ -116,7 +115,7 @@ func BenchmarkMultiInsertDifferent_256_Shard(b *testing.B) {
 }
 
 func BenchmarkMultiInsertSame(b *testing.B) {
-	m := New()
+	m := New(1000)
 	finished := make(chan struct{}, b.N)
 	_, set := GetSet(m, finished)
 	m.Set("key", "value")
@@ -144,7 +143,7 @@ func BenchmarkMultiInsertSameSyncMap(b *testing.B) {
 }
 
 func BenchmarkMultiGetSame(b *testing.B) {
-	m := New()
+	m := New(1000)
 	finished := make(chan struct{}, b.N)
 	get, _ := GetSet(m, finished)
 	m.Set("key", "value")
@@ -172,7 +171,7 @@ func BenchmarkMultiGetSameSyncMap(b *testing.B) {
 }
 
 func benchmarkMultiGetSetDifferent(b *testing.B) {
-	m := New()
+	m := New(1000)
 	finished := make(chan struct{}, 2*b.N)
 	get, set := GetSet(m, finished)
 	m.Set("-1", "value")
@@ -215,7 +214,7 @@ func BenchmarkMultiGetSetDifferent_256_Shard(b *testing.B) {
 }
 
 func benchmarkMultiGetSetBlock(b *testing.B) {
-	m := New()
+	m := New(1000)
 	finished := make(chan struct{}, 2*b.N)
 	get, set := GetSet(m, finished)
 	for i := 0; i < b.N; i++ {
@@ -290,17 +289,18 @@ func GetSetSyncMap(m *sync.Map, finished chan struct{}) (set func(key, value str
 }
 
 func runWithShards(bench func(b *testing.B), b *testing.B, shardsCount int) {
-	oldShardsCount := SHARD_COUNT
-	SHARD_COUNT = shardsCount
+	oldShardsCount := ShardCount
+	ShardCount = shardsCount
 	bench(b)
-	SHARD_COUNT = oldShardsCount
+	ShardCount = oldShardsCount
 }
 
 func BenchmarkKeys(b *testing.B) {
-	m := New()
+	count := 10000
+	m := New(count)
 
-	// Insert 100 elements.
-	for i := 0; i < 10000; i++ {
+	// Insert 10000 elements.
+	for i := 0; i < count; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
 	for i := 0; i < b.N; i++ {

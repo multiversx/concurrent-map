@@ -6,7 +6,7 @@ import (
 )
 
 // ShardCount represent the number of shard the map is devided into.
-const ShardCount = 100
+var ShardCount = 100
 
 // ConcurrentMap is a "thread" safe map of type string:Anything.
 // To avoid lock bottlenecks this map is dived to several (ShardCount) map shards.
@@ -361,8 +361,10 @@ func (m ConcurrentMap) isEvictionOccurred(key string) bool {
 func (m ConcurrentMap) removeFirstElement(key string) {
 	shard := m.GetShard(key)
 	shard.Lock()
-	copy(shard.mapKeys[0:], shard.mapKeys[1:])
-	shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]
+	if len(shard.mapKeys) > 0 {
+		copy(shard.mapKeys[0:], shard.mapKeys[1:])
+		shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]
+	}
 	shard.Unlock()
 }
 

@@ -40,11 +40,11 @@ func (m ConcurrentMap) GetShard(key string) *ConcurrentMapShared {
 
 func (m ConcurrentMap) MSet(data map[string]interface{}) {
 	for key, value := range data {
-		if m.isEvictionOccurred(key) {
-			m.removeFirstElement(key)
-		}
 		shard := m.GetShard(key)
 		shard.Lock()
+		if m.isEvictionOccurred(shard) {
+			m.removeFirstElement(key)
+		}
 		shard.items[key] = value
 		shard.mapKeys = append(shard.mapKeys, key)
 		shard.Unlock()
@@ -55,10 +55,10 @@ func (m ConcurrentMap) MSet(data map[string]interface{}) {
 func (m ConcurrentMap) Set(key string, value interface{}) {
 	// Get map shard.
 	shard := m.GetShard(key)
-	if m.isEvictionOccurred(key) {
+	shard.Lock()
+	if m.isEvictionOccurred(shard) {
 		m.removeFirstElement(key)
 	}
-	shard.Lock()
 	shard.items[key] = value
 	shard.mapKeys = append(shard.mapKeys, key)
 	shard.Unlock()
@@ -73,15 +73,17 @@ type UpsertCb func(exist bool, valueInMap interface{}, newValue interface{}) int
 // Upsert (Insert or Update) - updates existing element or inserts a new one using UpsertCb.
 func (m ConcurrentMap) Upsert(key string, value interface{}, cb UpsertCb) (res interface{}) {
 	shard := m.GetShard(key)
-
-	if m.isEvictionOccurred(key) {
-		m.removeFirstElement(key)
-	}
 	shard.Lock()
 	v, ok := shard.items[key]
 	res = cb(ok, v, value)
 	shard.items[key] = res
-	shard.mapKeys = append(shard.mapKeys, key)
+	if !ok {
+		if m.isEvictionOccurred(shard) {
+			m.removeFirstElement(key)
+			m.Remove(key)
+		}
+		shard.mapKeys = append(shard.mapKeys, key)
+	}
 	shard.Unlock()
 	return res
 }
@@ -90,11 +92,10 @@ func (m ConcurrentMap) Upsert(key string, value interface{}, cb UpsertCb) (res i
 func (m ConcurrentMap) SetIfAbsent(key string, value interface{}) bool {
 	// Get map shard.
 	shard := m.GetShard(key)
-
-	if m.isEvictionOccurred(key) {
+	shard.Lock()
+	if m.isEvictionOccurred(shard) {
 		m.removeFirstElement(key)
 	}
-	shard.Lock()
 	_, ok := shard.items[key]
 	if !ok {
 		shard.items[key] = value
@@ -350,9 +351,8 @@ func (m ConcurrentMap) MarshalJSON() ([]byte, error) {
 }
 
 // isEvictionOccurred check if the map size overflow the maximum allowed size.
-func (m ConcurrentMap) isEvictionOccurred(key string) bool {
-	shard := m.GetShard(key)
-	if m.Count() > shard.maxSize {
+func (m ConcurrentMap) isEvictionOccurred(shard *ConcurrentMapShared) bool {
+	if len(shard.mapKeys) > shard.maxSize {
 		return true
 	}
 	return false
@@ -361,14 +361,9 @@ func (m ConcurrentMap) isEvictionOccurred(key string) bool {
 // removeFirstElement removes the first element from the key slice.
 func (m ConcurrentMap) removeFirstElement(key string) {
 	shard := m.GetShard(key)
-	shard.Lock()
 	if len(shard.mapKeys) > 0 {
-		for i := 0; i < len(shard.mapKeys)-1; i++ {
-			shard.mapKeys[i] = shard.mapKeys[i+1]
-		}
-		shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]
+		shard.mapKeys = shard.mapKeys[1:]
 	}
-	shard.Unlock()
 }
 
 // removeMapKey removes the map key from the key slice.
@@ -379,7 +374,7 @@ func (m ConcurrentMap) removeMapKey(key string) {
 		for i := 0; i < len(shard.mapKeys)-1; i++ {
 			// The mutex lock will be called by the method invoker.
 			if string(key) == shard.mapKeys[i] {
-				shard.mapKeys[i] = shard.mapKeys[i+1]
+				shard.mapKeys = append(shard.mapKeys[:i], shard.mapKeys[i+1:]...)
 			}
 		}
 		shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]

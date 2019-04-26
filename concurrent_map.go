@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// ShardCount represent the number of shard the map is devided into.
+// ShardCount represent the number of shard the map is divided into.
 var ShardCount = 32
 
 // ConcurrentMap is a "thread" safe map of type string:Anything.
@@ -40,14 +40,7 @@ func (m ConcurrentMap) GetShard(key string) *ConcurrentMapShared {
 
 func (m ConcurrentMap) MSet(data map[string]interface{}) {
 	for key, value := range data {
-		shard := m.GetShard(key)
-		shard.Lock()
-		if m.isEvictionOccurred(shard) {
-			m.removeFirstElement(key)
-		}
-		shard.items[key] = value
-		shard.mapKeys = append(shard.mapKeys, key)
-		shard.Unlock()
+		m.Set(key, value)
 	}
 }
 
@@ -57,7 +50,7 @@ func (m ConcurrentMap) Set(key string, value interface{}) {
 	shard := m.GetShard(key)
 	shard.Lock()
 	if m.isEvictionOccurred(shard) {
-		m.removeFirstElement(key)
+		m.removeOldestMapKey(key)
 	}
 	shard.items[key] = value
 	shard.mapKeys = append(shard.mapKeys, key)
@@ -79,8 +72,7 @@ func (m ConcurrentMap) Upsert(key string, value interface{}, cb UpsertCb) (res i
 	shard.items[key] = res
 	if !ok {
 		if m.isEvictionOccurred(shard) {
-			m.removeFirstElement(key)
-			m.Remove(key)
+			m.removeOldestMapKey(key)
 		}
 		shard.mapKeys = append(shard.mapKeys, key)
 	}
@@ -94,7 +86,7 @@ func (m ConcurrentMap) SetIfAbsent(key string, value interface{}) bool {
 	shard := m.GetShard(key)
 	shard.Lock()
 	if m.isEvictionOccurred(shard) {
-		m.removeFirstElement(key)
+		m.removeOldestMapKey(key)
 	}
 	_, ok := shard.items[key]
 	if !ok {
@@ -320,6 +312,9 @@ func (m ConcurrentMap) Keys() []string {
 
 // FindOldest search for the oldest key in the key slice.
 func (m ConcurrentMap) FindOldest() string {
+	// TODO check the possibility to retrieve the oldest key per shard.
+	// This should match the interface method signature.
+	// Currently the method defined in the interface does not accept parameters.
 	keys := []string{}
 	for i := 0; i < ShardCount; i++ {
 		shard := m[i]
@@ -352,14 +347,19 @@ func (m ConcurrentMap) MarshalJSON() ([]byte, error) {
 
 // isEvictionOccurred check if the map size overflow the maximum allowed size.
 func (m ConcurrentMap) isEvictionOccurred(shard *ConcurrentMapShared) bool {
-	if len(shard.items) > shard.maxSize {
+	count := 0
+	for i := 0; i < ShardCount; i++ {
+		shard := m[i]
+		count += len(shard.items)
+	}
+	if count > shard.maxSize {
 		return true
 	}
 	return false
 }
 
-// removeFirstElement removes the first element from the key slice.
-func (m ConcurrentMap) removeFirstElement(key string) {
+// removeOldestMapKey removes the first element from the key slice.
+func (m ConcurrentMap) removeOldestMapKey(key string) {
 	shard := m.GetShard(key)
 	if len(shard.mapKeys) > 0 {
 		shard.mapKeys = shard.mapKeys[1:]

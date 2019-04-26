@@ -6,7 +6,7 @@ import (
 )
 
 // ShardCount represent the number of shard the map is devided into.
-var ShardCount = 100
+var ShardCount = 32
 
 // ConcurrentMap is a "thread" safe map of type string:Anything.
 // To avoid lock bottlenecks this map is dived to several (ShardCount) map shards.
@@ -352,7 +352,7 @@ func (m ConcurrentMap) MarshalJSON() ([]byte, error) {
 
 // isEvictionOccurred check if the map size overflow the maximum allowed size.
 func (m ConcurrentMap) isEvictionOccurred(shard *ConcurrentMapShared) bool {
-	if len(shard.mapKeys) > shard.maxSize {
+	if len(shard.items) > shard.maxSize {
 		return true
 	}
 	return false
@@ -371,13 +371,12 @@ func (m ConcurrentMap) removeMapKey(key string) {
 	shard := m.GetShard(key)
 
 	if len(shard.mapKeys) > 0 {
-		for i := 0; i < len(shard.mapKeys)-1; i++ {
+		for i := 0; i < len(shard.mapKeys); i++ {
 			// The mutex lock will be called by the method invoker.
 			if string(key) == shard.mapKeys[i] {
 				shard.mapKeys = append(shard.mapKeys[:i], shard.mapKeys[i+1:]...)
 			}
 		}
-		shard.mapKeys = shard.mapKeys[:len(shard.mapKeys)-1]
 	}
 }
 

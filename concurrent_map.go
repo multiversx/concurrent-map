@@ -324,7 +324,7 @@ func (m ConcurrentMap) FindOldest() string {
 		}
 		shard.Unlock()
 	}
-	return keys[0]
+	return keys[len(keys)-1]
 }
 
 // RemoveOldest removes the oldest key from the key slice.
@@ -347,12 +347,7 @@ func (m ConcurrentMap) MarshalJSON() ([]byte, error) {
 
 // isEvictionOccurred check if the map size overflow the maximum allowed size.
 func (m ConcurrentMap) isEvictionOccurred(shard *ConcurrentMapShared) bool {
-	count := 0
-	for i := 0; i < ShardCount; i++ {
-		shard := m[i]
-		count += len(shard.items)
-	}
-	if count > shard.maxSize {
+	if len(shard.items) > shard.maxSize {
 		return true
 	}
 	return false

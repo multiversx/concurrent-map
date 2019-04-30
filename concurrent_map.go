@@ -49,9 +49,6 @@ func (m ConcurrentMap) Set(key string, value interface{}) {
 	// Get map shard.
 	shard := m.GetShard(key)
 	shard.Lock()
-	if m.isEvictionOccurred(shard) {
-		m.removeOldestMapKey(key)
-	}
 	shard.items[key] = value
 	shard.mapKeys = append(shard.mapKeys, key)
 	shard.Unlock()
@@ -85,9 +82,6 @@ func (m ConcurrentMap) SetIfAbsent(key string, value interface{}) bool {
 	// Get map shard.
 	shard := m.GetShard(key)
 	shard.Lock()
-	if m.isEvictionOccurred(shard) {
-		m.removeOldestMapKey(key)
-	}
 	_, ok := shard.items[key]
 	if !ok {
 		shard.items[key] = value

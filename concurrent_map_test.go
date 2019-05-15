@@ -2,7 +2,6 @@ package cmap
 
 import (
 	"encoding/json"
-	"hash/fnv"
 	"sort"
 	"strconv"
 	"testing"
@@ -12,8 +11,8 @@ type Animal struct {
 	name string
 }
 
-func TestMapCreation(t *testing.T) {
-	m := New(100)
+func TestMapCreationV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 	if m == nil {
 		t.Error("map is null.")
 	}
@@ -23,8 +22,8 @@ func TestMapCreation(t *testing.T) {
 	}
 }
 
-func TestInsert(t *testing.T) {
-	m := New(100)
+func TestInsertV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 	elephant := Animal{"elephant"}
 	monkey := Animal{"monkey"}
 
@@ -36,8 +35,8 @@ func TestInsert(t *testing.T) {
 	}
 }
 
-func TestInsertAbsent(t *testing.T) {
-	m := New(100)
+func TestInsertAbsentV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 	elephant := Animal{"elephant"}
 	monkey := Animal{"monkey"}
 
@@ -47,8 +46,8 @@ func TestInsertAbsent(t *testing.T) {
 	}
 }
 
-func TestGet(t *testing.T) {
-	m := New(100)
+func TestGetV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	// Get a missing element.
 	val, ok := m.Get("Money")
@@ -82,8 +81,8 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestHas(t *testing.T) {
-	m := New(100)
+func TestHasV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	// Get a missing element.
 	if m.Has("Money") == true {
@@ -98,8 +97,8 @@ func TestHas(t *testing.T) {
 	}
 }
 
-func TestRemove(t *testing.T) {
-	m := New(100)
+func TestRemoveV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	monkey := Animal{"monkey"}
 	m.Set("monkey", monkey)
@@ -124,8 +123,8 @@ func TestRemove(t *testing.T) {
 	m.Remove("noone")
 }
 
-func TestRemoveCb(t *testing.T) {
-	m := New(100)
+func TestRemoveCbV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	monkey := Animal{"monkey"}
 	m.Set("monkey", monkey)
@@ -215,8 +214,8 @@ func TestRemoveCb(t *testing.T) {
 	}
 }
 
-func TestPop(t *testing.T) {
-	m := New(100)
+func TestPopV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	monkey := Animal{"monkey"}
 	m.Set("monkey", monkey)
@@ -255,8 +254,8 @@ func TestPop(t *testing.T) {
 	}
 }
 
-func TestCount(t *testing.T) {
-	m := New(100)
+func TestCountV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 	for i := 0; i < 100; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
@@ -266,8 +265,8 @@ func TestCount(t *testing.T) {
 	}
 }
 
-func TestIsEmpty(t *testing.T) {
-	m := New(100)
+func TestIsEmptyV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	if m.IsEmpty() == false {
 		t.Error("new map should be empty")
@@ -280,8 +279,8 @@ func TestIsEmpty(t *testing.T) {
 	}
 }
 
-func TestBufferedIterator(t *testing.T) {
-	m := New(100)
+func TestBufferedIteratorV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -304,8 +303,8 @@ func TestBufferedIterator(t *testing.T) {
 	}
 }
 
-func TestIterCb(t *testing.T) {
-	m := New(100)
+func TestIterCbV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -322,13 +321,14 @@ func TestIterCb(t *testing.T) {
 
 		counter++
 	})
+
 	if counter != 100 {
 		t.Error("We should have counted 100 elements.")
 	}
 }
 
-func TestItems(t *testing.T) {
-	m := New(100)
+func TestItemsV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -342,8 +342,8 @@ func TestItems(t *testing.T) {
 	}
 }
 
-func TestConcurrent(t *testing.T) {
-	m := New(100)
+func TestConcurrentV2(t *testing.T) {
+	m := New(1000 * uint32(ShardCount))
 	ch := make(chan int)
 	const iterations = 1000
 	var a [iterations]int
@@ -401,13 +401,13 @@ func TestConcurrent(t *testing.T) {
 	}
 }
 
-func TestJsonMarshal(t *testing.T) {
+func TestJsonMarshalV2(t *testing.T) {
 	ShardCount = 2
 	defer func() {
 		ShardCount = 32
 	}()
 	expected := "{\"a\":1,\"b\":2}"
-	m := New(100)
+	m := New(100 * uint32(ShardCount))
 	m.Set("a", 1)
 	m.Set("b", 2)
 	j, err := json.Marshal(m)
@@ -421,8 +421,8 @@ func TestJsonMarshal(t *testing.T) {
 	}
 }
 
-func TestKeys(t *testing.T) {
-	m := New(100)
+func TestKeysV2(t *testing.T) {
+	m := New(100 * uint32(ShardCount))
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -430,17 +430,18 @@ func TestKeys(t *testing.T) {
 	}
 
 	keys := m.Keys()
+
 	if len(keys) != 100 {
 		t.Error("We should have counted 100 elements.")
 	}
 }
 
-func TestMInsert(t *testing.T) {
+func TestMInsertV2(t *testing.T) {
 	animals := map[string]interface{}{
 		"elephant": Animal{"elephant"},
 		"monkey":   Animal{"monkey"},
 	}
-	m := New(100)
+	m := New(100 * uint32(ShardCount))
 	m.MSet(animals)
 
 	if m.Count() != 2 {
@@ -448,21 +449,7 @@ func TestMInsert(t *testing.T) {
 	}
 }
 
-func TestFnv32(t *testing.T) {
-	key := []byte("ABC")
-
-	hasher := fnv.New32()
-	_, err := hasher.Write(key)
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-	if fnv32(string(key)) != hasher.Sum32() {
-		t.Errorf("Bundled fnv32 produced %d, expected result from hash/fnv32 is %d", fnv32(string(key)), hasher.Sum32())
-	}
-
-}
-
-func TestUpsert(t *testing.T) {
+func TestUpsertV2(t *testing.T) {
 	dolphin := Animal{"dolphin"}
 	whale := Animal{"whale"}
 	tiger := Animal{"tiger"}
@@ -477,7 +464,7 @@ func TestUpsert(t *testing.T) {
 		return append(res, nv)
 	}
 
-	m := New(100)
+	m := New(100 * uint32(ShardCount))
 	m.Set("marine", []Animal{dolphin})
 	m.Upsert("marine", whale, cb)
 	m.Upsert("predator", tiger, cb)
@@ -515,10 +502,10 @@ func TestUpsert(t *testing.T) {
 	}
 }
 
-func TestKeysWhenRemoving(t *testing.T) {
+func TestKeysWhenRemovingV2(t *testing.T) {
 	// Insert 100 elements.
 	Total := 100
-	m := New(Total)
+	m := New(uint32(Total) * uint32(ShardCount))
 	for i := 0; i < Total; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
@@ -539,10 +526,10 @@ func TestKeysWhenRemoving(t *testing.T) {
 }
 
 //
-func TestUnDrainedIter(t *testing.T) {
+func TestUnDrainedIterV2(t *testing.T) {
 	// Insert 200 elements.
 	Total := 200
-	m := New(Total)
+	m := New(uint32(Total) * uint32(ShardCount))
 
 	for i := 0; i < Total; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
@@ -563,10 +550,10 @@ func TestUnDrainedIter(t *testing.T) {
 	}
 }
 
-func TestUnDrainedIterBuffered(t *testing.T) {
+func TestUnDrainedIterBufferedV2(t *testing.T) {
 	// Insert 100 elements.
 	Total := 100
-	m := New(Total)
+	m := New(2 * uint32(Total) * uint32(ShardCount))
 
 	for i := 0; i < Total; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})

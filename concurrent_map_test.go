@@ -2,7 +2,6 @@ package cmap
 
 import (
 	"encoding/json"
-	"hash/fnv"
 	"sort"
 	"strconv"
 	"testing"
@@ -13,7 +12,8 @@ type Animal struct {
 }
 
 func TestMapCreation(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 	if m == nil {
 		t.Error("map is null.")
 	}
@@ -24,7 +24,8 @@ func TestMapCreation(t *testing.T) {
 }
 
 func TestInsert(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 	elephant := Animal{"elephant"}
 	monkey := Animal{"monkey"}
 
@@ -37,7 +38,8 @@ func TestInsert(t *testing.T) {
 }
 
 func TestInsertAbsent(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 	elephant := Animal{"elephant"}
 	monkey := Animal{"monkey"}
 
@@ -48,7 +50,8 @@ func TestInsertAbsent(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	// Get a missing element.
 	val, ok := m.Get("Money")
@@ -83,7 +86,8 @@ func TestGet(t *testing.T) {
 }
 
 func TestHas(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	// Get a missing element.
 	if m.Has("Money") == true {
@@ -99,7 +103,8 @@ func TestHas(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	monkey := Animal{"monkey"}
 	m.Set("monkey", monkey)
@@ -125,7 +130,8 @@ func TestRemove(t *testing.T) {
 }
 
 func TestRemoveCb(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	monkey := Animal{"monkey"}
 	m.Set("monkey", monkey)
@@ -216,7 +222,8 @@ func TestRemoveCb(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	monkey := Animal{"monkey"}
 	m.Set("monkey", monkey)
@@ -256,7 +263,8 @@ func TestPop(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 	for i := 0; i < 100; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
@@ -267,7 +275,8 @@ func TestCount(t *testing.T) {
 }
 
 func TestIsEmpty(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	if m.IsEmpty() == false {
 		t.Error("new map should be empty")
@@ -280,32 +289,9 @@ func TestIsEmpty(t *testing.T) {
 	}
 }
 
-func TestIterator(t *testing.T) {
-	m := New()
-
-	// Insert 100 elements.
-	for i := 0; i < 100; i++ {
-		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
-	}
-
-	counter := 0
-	// Iterate over elements.
-	for item := range m.Iter() {
-		val := item.Val
-
-		if val == nil {
-			t.Error("Expecting an object.")
-		}
-		counter++
-	}
-
-	if counter != 100 {
-		t.Error("We should have counted 100 elements.")
-	}
-}
-
 func TestBufferedIterator(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -329,7 +315,8 @@ func TestBufferedIterator(t *testing.T) {
 }
 
 func TestIterCb(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -346,13 +333,15 @@ func TestIterCb(t *testing.T) {
 
 		counter++
 	})
+
 	if counter != 100 {
 		t.Error("We should have counted 100 elements.")
 	}
 }
 
 func TestItems(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -367,7 +356,8 @@ func TestItems(t *testing.T) {
 }
 
 func TestConcurrent(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 	ch := make(chan int)
 	const iterations = 1000
 	var a [iterations]int
@@ -426,12 +416,9 @@ func TestConcurrent(t *testing.T) {
 }
 
 func TestJsonMarshal(t *testing.T) {
-	SHARD_COUNT = 2
-	defer func() {
-		SHARD_COUNT = 32
-	}()
+	shardCount := 2
+	m := New(100*shardCount, shardCount)
 	expected := "{\"a\":1,\"b\":2}"
-	m := New()
 	m.Set("a", 1)
 	m.Set("b", 2)
 	j, err := json.Marshal(m)
@@ -446,7 +433,8 @@ func TestJsonMarshal(t *testing.T) {
 }
 
 func TestKeys(t *testing.T) {
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 
 	// Insert 100 elements.
 	for i := 0; i < 100; i++ {
@@ -454,6 +442,7 @@ func TestKeys(t *testing.T) {
 	}
 
 	keys := m.Keys()
+
 	if len(keys) != 100 {
 		t.Error("We should have counted 100 elements.")
 	}
@@ -464,26 +453,13 @@ func TestMInsert(t *testing.T) {
 		"elephant": Animal{"elephant"},
 		"monkey":   Animal{"monkey"},
 	}
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 	m.MSet(animals)
 
 	if m.Count() != 2 {
 		t.Error("map should contain exactly two elements.")
 	}
-}
-
-func TestFnv32(t *testing.T) {
-	key := []byte("ABC")
-
-	hasher := fnv.New32()
-	_, err := hasher.Write(key)
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-	if fnv32(string(key)) != hasher.Sum32() {
-		t.Errorf("Bundled fnv32 produced %d, expected result from hash/fnv32 is %d", fnv32(string(key)), hasher.Sum32())
-	}
-
 }
 
 func TestUpsert(t *testing.T) {
@@ -501,7 +477,8 @@ func TestUpsert(t *testing.T) {
 		return append(res, nv)
 	}
 
-	m := New()
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
 	m.Set("marine", []Animal{dolphin})
 	m.Upsert("marine", whale, cb)
 	m.Upsert("predator", tiger, cb)
@@ -540,10 +517,11 @@ func TestUpsert(t *testing.T) {
 }
 
 func TestKeysWhenRemoving(t *testing.T) {
-	m := New()
-
 	// Insert 100 elements.
 	Total := 100
+	shardCount := 32
+	m := New(Total*shardCount, shardCount)
+
 	for i := 0; i < Total; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
@@ -553,7 +531,7 @@ func TestKeysWhenRemoving(t *testing.T) {
 	for i := 0; i < Num; i++ {
 		go func(c *ConcurrentMap, n int) {
 			c.Remove(strconv.Itoa(n))
-		}(&m, i)
+		}(m, i)
 	}
 	keys := m.Keys()
 	for _, k := range keys {
@@ -565,43 +543,16 @@ func TestKeysWhenRemoving(t *testing.T) {
 
 //
 func TestUnDrainedIter(t *testing.T) {
-	m := New()
-	// Insert 100 elements.
-	Total := 100
+	// Insert 200 elements.
+	Total := 200
+	shardCount := 32
+	m := New(Total*shardCount, shardCount)
+
 	for i := 0; i < Total; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}
 	counter := 0
 	// Iterate over elements.
-	ch := m.Iter()
-	for item := range ch {
-		val := item.Val
-
-		if val == nil {
-			t.Error("Expecting an object.")
-		}
-		counter++
-		if counter == 42 {
-			break
-		}
-	}
-	for i := Total; i < 2*Total; i++ {
-		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
-	}
-	for item := range ch {
-		val := item.Val
-
-		if val == nil {
-			t.Error("Expecting an object.")
-		}
-		counter++
-	}
-
-	if counter != 100 {
-		t.Error("We should have been right where we stopped")
-	}
-
-	counter = 0
 	for item := range m.IterBuffered() {
 		val := item.Val
 
@@ -617,9 +568,11 @@ func TestUnDrainedIter(t *testing.T) {
 }
 
 func TestUnDrainedIterBuffered(t *testing.T) {
-	m := New()
 	// Insert 100 elements.
 	Total := 100
+	shardCount := 32
+	m := New(2*Total*shardCount, shardCount)
+
 	for i := 0; i < Total; i++ {
 		m.Set(strconv.Itoa(i), Animal{strconv.Itoa(i)})
 	}

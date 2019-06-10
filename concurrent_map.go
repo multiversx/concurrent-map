@@ -68,14 +68,17 @@ func (m *ConcurrentMap) Set(key string, value interface{}) {
 	// Get map shard.
 	shard := m.GetShard(key)
 	shard.Lock()
-	_, ok := shard.items[key]
+	v, ok := shard.items[key]
 	shard.items[key] = &valWithIndex{
 		arrayIdx: shard.idxAdd,
 		val:      value,
 	}
 	if !ok {
 		appendKeyToList(key, shard)
+	} else {
+		shard.mapKeys[v.arrayIdx] = ""
 	}
+
 	shard.Unlock()
 }
 
@@ -115,7 +118,10 @@ func (m *ConcurrentMap) Upsert(key string, value interface{}, cb UpsertCb) (res 
 	// if key is new add to the map
 	if !ok {
 		appendKeyToList(key, shard)
+	} else {
+		shard.mapKeys[v.arrayIdx] = ""
 	}
+
 	shard.Unlock()
 	return res
 }

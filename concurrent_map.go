@@ -12,12 +12,17 @@ type ConcurrentMap struct {
 	shards     []*ConcurrentMapShard
 }
 
+type valWithIndex struct {
+	val      interface{}
+	arrayIdx int
+}
+
 // ConcurrentMapShared is a "thread" safe string to anything map.
 type ConcurrentMapShard struct {
 	maxSize int
 	idxAdd  int
 	mapKeys []string
-	items   map[string]interface{}
+	items   map[string]*valWithIndex
 	sync.RWMutex // Read Write mutex, guards access to internal map.
 }
 
@@ -40,7 +45,7 @@ func New(maxSize int, shardCount int) *ConcurrentMap {
 			maxSize: shardSize,
 			idxAdd:  0,
 			mapKeys: make([]string, shardSize),
-			items:   make(map[string]interface{}),
+			items:   make(map[string]*valWithIndex),
 		}
 	}
 	return &m
@@ -63,11 +68,17 @@ func (m *ConcurrentMap) Set(key string, value interface{}) {
 	// Get map shard.
 	shard := m.GetShard(key)
 	shard.Lock()
-	_, ok := shard.items[key]
-	shard.items[key] = value
+	v, ok := shard.items[key]
+	shard.items[key] = &valWithIndex{
+		arrayIdx: shard.idxAdd,
+		val:      value,
+	}
 	if !ok {
 		appendKeyToList(key, shard)
+	} else {
+		shard.mapKeys[v.arrayIdx] = ""
 	}
+
 	shard.Unlock()
 }
 
@@ -78,6 +89,7 @@ func appendKeyToList(key string, shard *ConcurrentMapShard) {
 	shard.idxAdd++
 	shard.idxAdd %= shard.maxSize
 	keyToRemove := shard.mapKeys[shard.idxAdd]
+	shard.mapKeys[shard.idxAdd] = ""
 	delete(shard.items, keyToRemove)
 }
 
@@ -92,12 +104,24 @@ func (m *ConcurrentMap) Upsert(key string, value interface{}, cb UpsertCb) (res 
 	shard := m.GetShard(key)
 	shard.Lock()
 	v, ok := shard.items[key]
-	res = cb(ok, v, value)
-	shard.items[key] = res
+	if v == nil {
+		res = cb(ok, nil, value)
+	} else {
+		res = cb(ok, v.val, value)
+	}
+
+	shard.items[key] = &valWithIndex{
+		val:      res,
+		arrayIdx: shard.idxAdd,
+	}
+
 	// if key is new add to the map
 	if !ok {
 		appendKeyToList(key, shard)
+	} else {
+		shard.mapKeys[v.arrayIdx] = ""
 	}
+
 	shard.Unlock()
 	return res
 }
@@ -109,7 +133,7 @@ func (m *ConcurrentMap) SetIfAbsent(key string, value interface{}) bool {
 	shard.Lock()
 	_, ok := shard.items[key]
 	if !ok {
-		shard.items[key] = value
+		shard.items[key] = &valWithIndex{val: value, arrayIdx: shard.idxAdd}
 		appendKeyToList(key, shard)
 	}
 	shard.Unlock()
@@ -124,7 +148,11 @@ func (m *ConcurrentMap) Get(key string) (interface{}, bool) {
 	// Get item from shard.
 	val, ok := shard.items[key]
 	shard.RUnlock()
-	return val, ok
+	if !ok {
+		return nil, ok
+	}
+
+	return val.val, ok
 }
 
 // Count returns the number of elements within the map.
@@ -155,7 +183,11 @@ func (m *ConcurrentMap) Remove(key string) {
 	// Try to get shard.
 	shard := m.GetShard(key)
 	shard.Lock()
-	delete(shard.items, key)
+	v, ok := shard.items[key]
+	if ok {
+		shard.mapKeys[v.arrayIdx] = ""
+		delete(shard.items, key)
+	}
 	shard.Unlock()
 }
 
@@ -167,15 +199,24 @@ type RemoveCb func(key string, v interface{}, exists bool) bool
 // If callback returns true and element exists, it will remove it from the map
 // Returns the value returned by the callback (even if element was not present in the map)
 func (m *ConcurrentMap) RemoveCb(key string, cb RemoveCb) bool {
+	var remove bool
+
 	// Try to get shard.
 	shard := m.GetShard(key)
 	shard.Lock()
 	v, ok := shard.items[key]
-	remove := cb(key, v, ok)
+	if v == nil {
+		remove = cb(key, nil, ok)
+	} else {
+		remove = cb(key, v.val, ok)
+	}
+
 	if remove && ok {
+		shard.mapKeys[v.arrayIdx] = ""
 		delete(shard.items, key)
 	}
 	shard.Unlock()
+
 	return remove
 }
 
@@ -184,10 +225,17 @@ func (m *ConcurrentMap) Pop(key string) (v interface{}, exists bool) {
 	// Try to get shard.
 	shard := m.GetShard(key)
 	shard.Lock()
-	v, exists = shard.items[key]
-	delete(shard.items, key)
+	elem, exists := shard.items[key]
+	if exists {
+		shard.mapKeys[elem.arrayIdx] = ""
+		delete(shard.items, key)
+		shard.Unlock()
+
+		return elem.val, exists
+	}
 	shard.Unlock()
-	return v, exists
+
+	return nil, exists
 }
 
 // IsEmpty checks if map is empty.
@@ -229,7 +277,7 @@ func snapshot(m *ConcurrentMap) (chans []chan Tuple) {
 			chans[index] = make(chan Tuple, len(shard.items))
 			wg.Done()
 			for key, val := range shard.items {
-				chans[index] <- Tuple{key, val}
+				chans[index] <- Tuple{key, val.val}
 			}
 			shard.RUnlock()
 			close(chans[index])
@@ -280,7 +328,7 @@ func (m *ConcurrentMap) IterCb(fn IterCb) {
 		shard := (m.shards)[idx]
 		shard.RLock()
 		for key, value := range shard.items {
-			fn(key, value)
+			fn(key, value.val)
 		}
 		shard.RUnlock()
 	}
@@ -298,8 +346,14 @@ func (m *ConcurrentMap) Keys() []string {
 			go func(shard *ConcurrentMapShard) {
 				// Foreach key, value pair.
 				shard.RLock()
-				for key := range shard.items {
-					ch <- key
+				last := shard.idxAdd + 1
+				last %= shard.maxSize
+
+				for i := last; i != shard.idxAdd; i = (i + 1) % shard.maxSize {
+					if len(shard.mapKeys[i]) == 0 {
+						continue
+					}
+					ch <- shard.mapKeys[i]
 				}
 				shard.RUnlock()
 				wg.Done()

@@ -2,6 +2,8 @@ package cmap
 
 import (
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"sort"
 	"strconv"
 	"testing"
@@ -127,6 +129,76 @@ func TestRemove(t *testing.T) {
 
 	// Remove a none existing element.
 	m.Remove("noone")
+}
+
+func TestSetDuplicateGetAfterRemoveShouldErr(t *testing.T) {
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
+	key := fmt.Sprintf("%x", rand.Int63n(1<<60))
+	value := "duplicated"
+
+	m.Set(key, value)
+	// set again
+	m.Set(key, value)
+
+	m.Remove(key)
+	val, found := m.Get(key)
+
+	if found {
+		t.Error("Expecting to not find item after removal")
+	}
+
+	if val != nil {
+		t.Error("Expecting item to be nil after its removal")
+	}
+}
+
+func TestSetIfAbsentDuplicateGetAfterRemoveShouldErr(t *testing.T) {
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
+	key := fmt.Sprintf("%x", rand.Int63n(1<<60))
+	value := "duplicated"
+
+	added := m.SetIfAbsent(key, value)
+	if !added {
+		t.Error("Not expecting item to be found")
+	}
+
+	// set again
+	added = m.SetIfAbsent(key, value)
+	if added {
+		t.Error("Expecting item to be found")
+	}
+
+	m.Remove(key)
+	val, found := m.Get(key)
+
+	if found {
+		t.Error("Expecting to not find item after removal")
+	}
+
+	if val != nil {
+		t.Error("Expecting item to be nil after its removal")
+	}
+}
+
+func TestKeysShouldNotReportRemovedKey(t *testing.T) {
+	shardCount := 32
+	m := New(100*shardCount, shardCount)
+	key := fmt.Sprintf("%x", rand.Int63n(1<<60))
+
+	m.Set(key, key)
+	// set again
+	m.Set(key, key)
+
+	m.Remove(key)
+	keys := m.Keys()
+
+	for _, k := range keys {
+		if k == key {
+			t.Error("Not expecting to find removed key")
+		}
+	}
 }
 
 func TestRemoveCb(t *testing.T) {

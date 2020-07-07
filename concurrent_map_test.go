@@ -39,6 +39,21 @@ func TestInsert(t *testing.T) {
 	}
 }
 
+func TestInsertWithDuplicates(t *testing.T) {
+	shardCount := 1
+	m := New(5*shardCount, shardCount)
+	elephant := Animal{"elephant"}
+
+	for i := 0; i < 1000; i++ {
+		m.Set("elephant", elephant)
+		key := fmt.Sprintf("%x", rand.Int63n(1<<60))
+		m.Set(key, Animal{key})
+	}
+	if m.Count() > 5 {
+		t.Error("map should contain no more than 5 elements but contains", m.Count())
+	}
+}
+
 func TestInsertAbsent(t *testing.T) {
 	shardCount := 32
 	m := New(100*shardCount, shardCount)

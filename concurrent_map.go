@@ -19,10 +19,10 @@ type valWithIndex struct {
 
 // ConcurrentMapShared is a "thread" safe string to anything map.
 type ConcurrentMapShard struct {
-	maxSize int
-	idxAdd  int
-	mapKeys []string
-	items   map[string]*valWithIndex
+	maxSize      int
+	idxAdd       int
+	mapKeys      []string
+	items        map[string]*valWithIndex
 	sync.RWMutex // Read Write mutex, guards access to internal map.
 }
 
@@ -73,11 +73,12 @@ func (m *ConcurrentMap) Set(key string, value interface{}) {
 		arrayIdx: shard.idxAdd,
 		val:      value,
 	}
-	if !ok {
-		appendKeyToList(key, shard)
-	} else {
+
+	if ok {
 		shard.mapKeys[v.arrayIdx] = ""
 	}
+
+	appendKeyToList(key, shard)
 
 	shard.Unlock()
 }
@@ -118,7 +119,7 @@ func (m *ConcurrentMap) Upsert(key string, value interface{}, cb UpsertCb) (res 
 	// if key is new add to the map
 	if !ok {
 		appendKeyToList(key, shard)
-	} else {
+	} else if v != nil {
 		shard.mapKeys[v.arrayIdx] = ""
 	}
 
@@ -212,7 +213,9 @@ func (m *ConcurrentMap) RemoveCb(key string, cb RemoveCb) bool {
 	}
 
 	if remove && ok {
-		shard.mapKeys[v.arrayIdx] = ""
+		if v != nil {
+			shard.mapKeys[v.arrayIdx] = ""
+		}
 		delete(shard.items, key)
 	}
 	shard.Unlock()

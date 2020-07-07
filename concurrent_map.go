@@ -73,12 +73,12 @@ func (m *ConcurrentMap) Set(key string, value interface{}) {
 		arrayIdx: shard.idxAdd,
 		val:      value,
 	}
-	if !ok {
-		appendKeyToList(key, shard)
-	} else {
+
+	if ok {
 		shard.mapKeys[v.arrayIdx] = ""
-		appendKeyToList(key, shard)
 	}
+
+	appendKeyToList(key, shard)
 
 	shard.Unlock()
 }

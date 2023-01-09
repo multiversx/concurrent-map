@@ -1,3 +1,3 @@
-module github.com/ElrondNetwork/concurrent-map
+module github.com/multiversx/concurrent-map
 
-go 1.12
+go 1.17
